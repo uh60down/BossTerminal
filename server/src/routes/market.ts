@@ -186,7 +186,9 @@ async function getQuotes(symbols: string[]): Promise<yahoo.Quote[]> {
   // Fill gaps Nasdaq's quote endpoints don't cover (open, P/E, EPS, dividend
   // yield, beta, shares outstanding) from TradingView's public scanner API,
   // in one batched request for every quote that resolved an exchange.
-  const needsFundamentals = [...fetched.values()].filter((q) => q.exchange && q.pe === null);
+  const needsFundamentals = [...fetched.values()].filter(
+    (q) => q.exchange && q.pe === null && !isYahooInternational(q.symbol)
+  );
   if (needsFundamentals.length > 0) {
     try {
       const fundamentals = await tradingview.scanFundamentals(
