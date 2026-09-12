@@ -47,8 +47,11 @@ export default function BossBuyZoneWidget({ widget }: { widget: WidgetInstance }
         <div className="text-3xl leading-tight">{result.score}</div>
         <div className="text-sm font-bold tracking-[0.12em]">{result.status}</div>
       </div>
-      <div className="mt-2 flex items-center justify-between text-[10px] dim">
-        <span>NORMAL</span><span>WATCH</span><span>BUY</span><span>BOSS</span>
+      <div className="relative mt-2 h-3 text-[10px] dim">
+        <span className="absolute left-0">NORMAL</span>
+        <span className="absolute left-[20%] -translate-x-1/2">WATCH</span>
+        <span className="absolute left-[40%] -translate-x-1/2">BUY</span>
+        <span className="absolute left-[65%] -translate-x-1/2">BOSS</span>
       </div>
       <div className="mt-1 h-1 bg-[#222]">
         <div className="h-full bg-[var(--amber)] transition-all" style={{ width: `${result.score}%` }} />
