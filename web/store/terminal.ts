@@ -57,6 +57,15 @@ const DEFAULT_WIDGETS: WidgetInstance[] = [
   { id: "w-macro", type: "macro", linked: false },
 ];
 
+export const BOSS_WATCHLIST = [
+  // Core / income
+  "VOO", "QQQM", "SCHD", "HDV", "VYM", "JEPI", "O", "TLT", "GLDM",
+  // Growth / tactical
+  "NVDA", "PLTR", "OKLO", "KTOS", "AGIX", "SMH", "SOXL", "MO",
+  // Boss Japan — Yahoo Finance Tokyo suffix
+  "1605.T", "7011.T", "8058.T", "8306.T",
+];
+
 const DEFAULT_LAYOUT: LayoutItem[] = [
   { i: "w-boss-buy-zone", x: 0, y: 0, w: 5, h: 10 },
   { i: "w-chart", x: 5, y: 0, w: 7, h: 12 },
@@ -91,7 +100,7 @@ export const useTerminal = create<TerminalState>()(
       activeSymbol: "AAPL",
       widgets: DEFAULT_WIDGETS,
       layout: DEFAULT_LAYOUT,
-      watchlist: ["AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "GOOGL", "META", "SPY"],
+      watchlist: BOSS_WATCHLIST,
       commandOpen: false,
       setActiveSymbol: (s) => set({ activeSymbol: s.toUpperCase() }),
       setCommandOpen: (open) => set({ commandOpen: open }),
@@ -124,7 +133,7 @@ export const useTerminal = create<TerminalState>()(
           watchlist: st.watchlist.includes(s.toUpperCase()) ? st.watchlist : [...st.watchlist, s.toUpperCase()],
         })),
       removeFromWatchlist: (s) => set((st) => ({ watchlist: st.watchlist.filter((x) => x !== s) })),
-      resetWorkspace: () => set({ widgets: DEFAULT_WIDGETS, layout: DEFAULT_LAYOUT }),
+      resetWorkspace: () => set({ widgets: DEFAULT_WIDGETS, layout: DEFAULT_LAYOUT, watchlist: BOSS_WATCHLIST }),
     }),
     { name: "openterminal-workspace" }
   )

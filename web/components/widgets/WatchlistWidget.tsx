@@ -17,7 +17,9 @@ export default function WatchlistWidget() {
     queryKey: ["watchlist", watchlist.join(",")],
     queryFn: () => apiGet<Quote[]>(`/api/quotes?symbols=${watchlist.join(",")}`),
     enabled: watchlist.length > 0,
-    refetchInterval: 1_000,
+    // International quotes rely on public endpoints; five seconds keeps the
+    // list responsive without hammering a free fallback provider.
+    refetchInterval: 5_000,
   });
 
   return (

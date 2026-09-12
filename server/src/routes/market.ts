@@ -19,6 +19,12 @@ const QUOTE_TTL = 1_000;
 const HISTORY_TTL = 20_000;
 const NEWS_TTL = 60_000;
 
+const YAHOO_INTERNATIONAL_SUFFIX = /\.(MI|PA|AS|BR|LS|DE|L|MC|SW|ST|CO|HE|OL|TO|AX|HK|T|NS|BO)$/i;
+
+function isYahooInternational(symbol: string): boolean {
+  return YAHOO_INTERNATIONAL_SUFFIX.test(symbol);
+}
+
 function fail(req: any, res: any, err: unknown) {
   const detail = err instanceof Error ? err.message : String(err);
   console.error("[market]", req.path, detail);
@@ -132,9 +138,23 @@ async function getQuotes(symbols: string[]): Promise<yahoo.Quote[]> {
     remaining = remaining.filter((s) => !fetched.has(s));
   }
 
-  const nasdaqResults = await Promise.allSettled(remaining.map((s) => nasdaq.quote(s)));
+  const japanSymbols = remaining.filter((s) => /\.T$/i.test(s));
+  if (japanSymbols.length > 0) {
+    try {
+      const rows = await tradingview.japanQuotes(japanSymbols);
+      for (const q of rows) fetched.set(q.symbol, q);
+    } catch {
+      // Yahoo below remains the fallback for Tokyo listings.
+    }
+    remaining = remaining.filter((s) => !fetched.has(s));
+  }
+
+  // Suffixed international listings are handled by their international
+  // provider or Yahoo; sending them to Nasdaq only adds a predictable failure.
+  const nasdaqSymbols = remaining.filter((s) => !isYahooInternational(s));
+  const nasdaqResults = await Promise.allSettled(nasdaqSymbols.map((s) => nasdaq.quote(s)));
   nasdaqResults.forEach((r, i) => {
-    if (r.status === "fulfilled") fetched.set(remaining[i], r.value);
+    if (r.status === "fulfilled") fetched.set(nasdaqSymbols[i], r.value);
   });
   remaining = remaining.filter((s) => !fetched.has(s));
 
@@ -187,7 +207,9 @@ async function getQuotes(symbols: string[]): Promise<yahoo.Quote[]> {
     }
   }
 
-  for (const [sym, q] of fetched) cacheStore(`quote:${sym}`, q, QUOTE_TTL);
+  for (const [sym, q] of fetched) {
+    cacheStore(`quote:${sym}`, q, isYahooInternational(sym) ? 15_000 : QUOTE_TTL);
+  }
 
   const out: yahoo.Quote[] = [];
   for (const sym of symbols) {
@@ -215,6 +237,16 @@ marketRouter.get("/quotes", async (req, res) => {
 
 // ---- history / candles ----
 
+function historyAttempts(symbol: string, rangeKey: string): Array<[string, () => Promise<yahoo.Candle[]>]> {
+  const attempts: Array<[string, () => Promise<yahoo.Candle[]>]> = [];
+  if (!isYahooInternational(symbol)) attempts.push(["nasdaq", () => nasdaq.history(symbol, rangeKey)]);
+  attempts.push(
+    ["yahoo", () => yahoo.history(symbol, yahooRange(rangeKey).range, yahooRange(rangeKey).interval)],
+    ["stooq", () => stooq.history(symbol)],
+  );
+  return attempts;
+}
+
 marketRouter.get("/history/:symbol", async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   const rangeKey = String(req.query.range ?? "6M");
@@ -224,11 +256,7 @@ marketRouter.get("/history/:symbol", async (req, res) => {
         ? binance.history(symbol, rangeKey)
         : isVix(symbol)
         ? vixHistory(rangeKey)
-        : withFallback([
-            ["nasdaq", () => nasdaq.history(symbol, rangeKey)],
-            ["yahoo", () => yahoo.history(symbol, yahooRange(rangeKey).range, yahooRange(rangeKey).interval)],
-            ["stooq", () => stooq.history(symbol)],
-          ])
+        : withFallback(historyAttempts(symbol, rangeKey))
     );
     if (!Array.isArray(data) || data.length === 0) throw new Error("empty history from all providers");
     res.json(data);
