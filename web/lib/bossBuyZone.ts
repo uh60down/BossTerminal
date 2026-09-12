@@ -27,6 +27,8 @@ function drawdown(candles: Candle[]): number | null {
 
 function drawdownPoints(value: number | null, maxPoints: number): number {
   if (value === null) return 0;
+  // A routine 5% pullback counts lightly; stress accelerates after a 10% correction.
+  // The intentionally nonlinear ramp avoids declaring a buy zone on ordinary noise.
   if (value <= -20) return maxPoints;
   if (value <= -15) return Math.round(maxPoints * 0.8);
   if (value <= -10) return Math.round(maxPoints * 0.6);

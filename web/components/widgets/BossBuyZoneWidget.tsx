@@ -5,7 +5,7 @@ import { apiGet, type Candle } from "../../lib/api";
 import { calculateBossBuyZone, type BossZoneStatus } from "../../lib/bossBuyZone";
 import { useWidgetSymbol, type WidgetInstance } from "../../store/terminal";
 
-type MacroData = { vix: number | null };
+type MacroData = { vix: number | null; vixSource?: string | null };
 
 const STATUS_STYLE: Record<BossZoneStatus, string> = {
   NORMAL: "text-[var(--up)] border-[var(--up)]",
@@ -29,15 +29,24 @@ export default function BossBuyZoneWidget({ widget }: { widget: WidgetInstance }
     })),
   });
 
-  const error = macro.error ?? histories.find((q) => q.error)?.error;
-  if (error) return <div className="p-2 down">Error: {(error as Error).message}</div>;
-  if (!macro.data || histories.some((q) => !q.data)) return <div className="p-2 dim">Calculating market stress…</div>;
+  const queries = [macro, ...histories];
+  const hasData = Boolean(macro.data || histories.some((q) => q.data));
+  const isLoading = queries.some((q) => q.isPending);
+  const failures = [
+    macro.error ? "VIX" : null,
+    histories[0].error ? "S&P 500" : null,
+    histories[1].error ? "Nasdaq" : null,
+    histories[2].error ? symbol : null,
+  ].filter((label): label is string => label !== null);
+
+  if (!hasData && isLoading) return <div className="p-2 dim">Calculating market stress…</div>;
+  if (!hasData) return <div className="p-2 down">Market data is temporarily unavailable.</div>;
 
   const result = calculateBossBuyZone(
-    macro.data.vix,
-    histories[0].data!,
-    histories[1].data!,
-    histories[2].data!,
+    macro.data?.vix ?? null,
+    histories[0].data ?? [],
+    histories[1].data ?? [],
+    histories[2].data ?? [],
   );
 
   return (
@@ -71,6 +80,14 @@ export default function BossBuyZoneWidget({ widget }: { widget: WidgetInstance }
       <div className="mt-2 text-[10px] dim leading-relaxed">
         {symbol} technical stress is combined with broad-market fear. This is an accumulation signal, not an automatic order.
       </div>
+      {macro.data?.vixSource && (
+        <div className="mt-1 text-[9px] dim">VIX source: {macro.data.vixSource === "fred" ? "FRED (previous close)" : "live market quote"}</div>
+      )}
+      {failures.length > 0 && (
+        <div className="mt-1 text-[10px] text-[#ffd966]">
+          Partial score — unavailable: {failures.join(", ")}. Available signals remain visible.
+        </div>
+      )}
     </div>
   );
 }
