@@ -18,7 +18,8 @@ export type WidgetType =
   | "calendar"
   | "insider"
   | "tv"
-  | "recap";
+  | "recap"
+  | "boss-buy-zone";
 
 export type WidgetInstance = {
   id: string;
@@ -48,6 +49,7 @@ type TerminalState = {
 };
 
 const DEFAULT_WIDGETS: WidgetInstance[] = [
+  { id: "w-boss-buy-zone", type: "boss-buy-zone", linked: true },
   { id: "w-chart", type: "chart", linked: true },
   { id: "w-quote", type: "quote", linked: true },
   { id: "w-watchlist", type: "watchlist", linked: false },
@@ -56,11 +58,12 @@ const DEFAULT_WIDGETS: WidgetInstance[] = [
 ];
 
 const DEFAULT_LAYOUT: LayoutItem[] = [
-  { i: "w-chart", x: 0, y: 0, w: 7, h: 12 },
-  { i: "w-quote", x: 7, y: 0, w: 5, h: 6 },
-  { i: "w-watchlist", x: 7, y: 6, w: 5, h: 6 },
-  { i: "w-news", x: 0, y: 12, w: 7, h: 7 },
-  { i: "w-macro", x: 7, y: 12, w: 5, h: 7 },
+  { i: "w-boss-buy-zone", x: 0, y: 0, w: 5, h: 10 },
+  { i: "w-chart", x: 5, y: 0, w: 7, h: 12 },
+  { i: "w-quote", x: 0, y: 10, w: 5, h: 6 },
+  { i: "w-watchlist", x: 5, y: 12, w: 4, h: 7 },
+  { i: "w-macro", x: 9, y: 12, w: 3, h: 7 },
+  { i: "w-news", x: 0, y: 19, w: 12, h: 7 },
 ];
 
 const SIZE_BY_TYPE: Record<WidgetType, { w: number; h: number }> = {
@@ -79,6 +82,7 @@ const SIZE_BY_TYPE: Record<WidgetType, { w: number; h: number }> = {
   insider: { w: 7, h: 9 },
   tv: { w: 6, h: 11 },
   recap: { w: 5, h: 12 },
+  "boss-buy-zone": { w: 5, h: 10 },
 };
 
 export const useTerminal = create<TerminalState>()(
