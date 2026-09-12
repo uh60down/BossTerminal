@@ -1,0 +1,51 @@
+# Production overlay for a single-machine deployment (e.g. a small VPS
+# reachable only over Tailscale — see docs/deployment/tailscale-vps.md).
+# Adds: resource limits, stricter required secrets, healthcheck-gated
+# startup ordering, and a scheduled SQLite backup service.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# `mem_limit`/`cpus` (rather than `deploy.resources`) are used deliberately:
+# they're honored by a plain `docker compose up` on a single machine without
+# depending on Swarm-specific behavior. See "Resource requirements" in
+# docs/deployment/tailscale-vps.md for the sizing this assumes.
+services:
+  api:
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - API_KEY=${API_KEY:?Set API_KEY in .env — see docs/deployment/tailscale-vps.md}
+      - API_HOST=0.0.0.0
+      - WEB_ORIGIN=${WEB_ORIGIN:?Set WEB_ORIGIN in .env to your Tailscale Serve HTTPS URL}
+      - DATA_DIR=/app/data
+      - TRUST_PROXY=${TRUST_PROXY:-}
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "1.0"
+
+  web:
+    environment:
+      - API_URL=http://api:4000
+      - API_KEY=${API_KEY:?Set API_KEY in .env — see docs/deployment/tailscale-vps.md}
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "1.0"
+
+  # One-shot SQLite snapshot job — not part of `up`. Runs on a schedule via
+  # the host's systemd timer (deploy/systemd/), not as a long-lived
+  # container, so its own restarts/health aren't a concern.
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  #     --profile backup run --rm backup
+  backup:
+    build: ./deploy/backup
+    profiles: ["backup"]
+    environment:
+      - RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - terminal-data:/data:ro
+      - ./backups:/backups
+    mem_limit: 128m
+    cpus: "0.5"

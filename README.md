@@ -152,6 +152,10 @@ docker compose up --build
 
 Portfolio data persists in the `terminal-data` volume (SQLite, WAL mode). Ports are published on `127.0.0.1` only by default; see [Security defaults](#security-defaults) to expose it deliberately.
 
+### Running it 24/7
+
+For a repeatable, always-on deployment — resource sizing, healthchecks, a systemd-managed restart policy, and automated SQLite backups — see [`docs/deployment/tailscale-vps.md`](docs/deployment/tailscale-vps.md). It walks through a specific topology (private VPS reachable only via [Tailscale Serve](https://tailscale.com/kb/1312/serve), no public application ports), but `docker-compose.prod.yml` and `deploy/` are reusable regardless of how you handle network access.
+
 <br/>
 
 ## 🧱 Tech stack

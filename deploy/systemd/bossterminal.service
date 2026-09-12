@@ -1,0 +1,17 @@
+[Unit]
+Description=BossTerminal (Docker Compose stack)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Adjust to wherever you cloned the repo on the VPS.
+WorkingDirectory=/opt/bossterminal
+ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

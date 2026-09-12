@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the BossTerminal SQLite backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+# Catches up on a missed run if the VPS was rebooted/down at 03:00.
+Persistent=true
+# Spreads load if you ever run several of these units on one host.
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target
