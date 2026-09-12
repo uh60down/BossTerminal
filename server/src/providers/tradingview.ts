@@ -1,3 +1,5 @@
+import type { Quote } from "./yahoo.js";
+
 // TradingView's public scanner/search endpoints — used by tradingview.com's
 // own screener widget and symbol search box. No API key. Requires a
 // believable Referer/Origin or the edge returns 403.
@@ -9,6 +11,43 @@ const HEADERS = {
   Referer: "https://www.tradingview.com/",
   Origin: "https://www.tradingview.com",
 };
+
+/** Live Tokyo Stock Exchange quotes, keyed with Yahoo-compatible `.T` symbols. */
+export async function japanQuotes(symbols: string[]): Promise<Quote[]> {
+  const tickers = symbols
+    .filter((symbol) => /\.T$/i.test(symbol))
+    .map((symbol) => `TSE:${symbol.replace(/\.T$/i, "")}`);
+  if (tickers.length === 0) return [];
+
+  const res = await fetch("https://scanner.tradingview.com/japan/scan", {
+    method: "POST",
+    headers: HEADERS,
+    body: JSON.stringify({
+      symbols: { tickers },
+      columns: ["description", "close", "change", "open", "high", "low", "volume", "currency", "exchange"],
+    }),
+  });
+  if (!res.ok) throw new Error(`tradingview japan scan ${res.status}`);
+  const json = await res.json();
+  const rows: Array<{ s: string; d: any[] }> = json?.data ?? [];
+
+  return rows.map((row) => {
+    const [name, price, changePercent, open, high, low, volume, currency, exchange] = row.d;
+    const symbol = `${row.s.split(":")[1]}.T`;
+    const previousClose = price !== null && changePercent !== null
+      ? price / (1 + changePercent / 100)
+      : null;
+    return {
+      symbol, name: name ?? null, price: price ?? null,
+      change: price !== null && previousClose !== null ? price - previousClose : null,
+      changePercent: changePercent ?? null, open: open ?? null, high: high ?? null, low: low ?? null,
+      previousClose, bid: null, ask: null, volume: volume ?? null, avgVolume: null,
+      marketCap: null, pe: null, eps: null, dividendYield: null, week52High: null,
+      week52Low: null, beta: null, sharesOutstanding: null, currency: currency ?? "JPY",
+      exchange: exchange ?? "TSE", marketState: null, time: null, source: "tradingview-japan",
+    };
+  });
+}
 
 /** Map a Nasdaq-reported exchange label to TradingView's exchange prefix. */
 export function toTVExchange(exchange: string | null): string {
