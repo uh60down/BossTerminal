@@ -399,7 +399,13 @@ marketRouter.get("/macro", async (req, res) => {
   try {
     const [yieldResults, vix, quotes] = await Promise.all([
       Promise.allSettled(YIELD_SERIES.map((s) => cached(`fred:${s.id}`, 300_000, () => fred.latest(s.id)))),
-      cached("fred:VIXCLS", 300_000, () => fred.latest("VIXCLS")).catch(() => null),
+      // Prefer an intraday VIX quote for stress-sensitive widgets. FRED remains
+      // the resilient end-of-day fallback when Yahoo is unavailable or throttled.
+      cached("quote:^VIX:live", 30_000, () => yahoo.quoteFromChart("^VIX"))
+        .then((q) => ({ value: q.price, source: q.source }))
+        .catch(() => cached("fred:VIXCLS", 300_000, () => fred.latest("VIXCLS"))
+          .then((p) => p ? { value: p.value, source: "fred" } : null)
+          .catch(() => null)),
       getQuotes(Object.keys(INDEX_PROXIES)),
     ]);
     const yields = YIELD_SERIES.map((s, i) => {
@@ -415,7 +421,7 @@ marketRouter.get("/macro", async (req, res) => {
     }));
 
     if (yields.length === 0 && indexes.length === 0) throw new Error("no macro data from any provider");
-    res.json({ yields, vix: vix?.value ?? null, indexes });
+    res.json({ yields, vix: vix?.value ?? null, vixSource: vix?.source ?? null, indexes });
   } catch (err) {
     fail(req, res, err);
   }
