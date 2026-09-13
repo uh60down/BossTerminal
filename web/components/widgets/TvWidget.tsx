@@ -6,17 +6,20 @@ import Hls from "hls.js";
 const CHANNELS = [
   { id: "bloomberg", label: "Bloomberg TV", kind: "hls", url: "https://liveprodusphoenixeast.global.ssl.fastly.net/USPhx-HD/Channel-TX-USPhx-AWS-virginia-1/Source-USPhx-16k-1-s6lk2-BP-07-02-81ykIWnsMsg_live.m3u8" },
   { id: "yahoo", label: "Yahoo Finance", kind: "hls", url: "https://d1ewctnvcwvvvu.cloudfront.net/playlist.m3u8" },
-  { id: "cnbc", label: "CNBC", kind: "youtube", url: "https://www.youtube.com/watch?v=9NyxcX3rhQs" },
+  {
+    id: "cnbc",
+    label: "CNBC",
+    kind: "youtube",
+    channelId: "UCvJJ_dzjViJCoLf5uKUTwoA",
+    // Requested live source: https://www.youtube.com/watch?v=9NyxcX3rhQs
+    url: "https://www.youtube.com/watch?v=9NyxcX3rhQs",
+  },
   { id: "cheddar", label: "Cheddar Business", kind: "hls", url: "https://gpuserver3.tier1streams.com/CHEDDAR_BUSINESS/index.m3u8" },
   { id: "ndtv", label: "NDTV Profit", kind: "hls", url: "https://ndtvprofit.akamaized.net/hls/live/2107404/ndtvprofit/master_1.m3u8" },
 ] as const;
 
-const youtubeEmbedUrl = (url: string) => {
-  const videoId = new URL(url).searchParams.get("v");
-  return videoId
-    ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1`
-    : url;
-};
+const youtubeLiveEmbedUrl = (channelId: string) =>
+  `https://www.youtube-nocookie.com/embed/live_stream?channel=${encodeURIComponent(channelId)}&autoplay=1&mute=1&playsinline=1`;
 
 export default function TvWidget() {
   const [channel, setChannel] = useState<(typeof CHANNELS)[number]>(CHANNELS[0]);
@@ -69,7 +72,7 @@ export default function TvWidget() {
         {channel.kind === "youtube" ? (
           <iframe
             key={channel.url}
-            src={youtubeEmbedUrl(channel.url)}
+            src={youtubeLiveEmbedUrl(channel.channelId)}
             title={`${channel.label} live stream`}
             className="w-full h-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture"
