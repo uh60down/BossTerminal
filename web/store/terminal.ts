@@ -54,6 +54,8 @@ const GLOBAL_SELECTION_WIDGETS = new Set<WidgetType>([
   "chart",
   "news",
   "insider",
+  "quote",
+  "options",
 ]);
 
 const DEFAULT_WIDGETS: WidgetInstance[] = [
