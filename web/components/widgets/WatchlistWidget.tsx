@@ -10,7 +10,7 @@ export default function WatchlistWidget() {
   const watchlist = useTerminal((s) => s.watchlist);
   const addToWatchlist = useTerminal((s) => s.addToWatchlist);
   const removeFromWatchlist = useTerminal((s) => s.removeFromWatchlist);
-  const setActiveSymbol = useTerminal((s) => s.setActiveSymbol);
+  const selectSymbol = useTerminal((s) => s.selectSymbol);
   const [input, setInput] = useState("");
 
   const { data = [] } = useQuery({
@@ -50,7 +50,7 @@ export default function WatchlistWidget() {
           {watchlist.map((sym) => {
             const q = data.find((d) => d.symbol === sym);
             return (
-              <tr key={sym} onClick={() => setActiveSymbol(sym)}>
+              <tr key={sym} onClick={() => selectSymbol(sym)}>
                 <td className="font-bold">{sym}</td>
                 <td><Flash value={q?.price}>{fmt(q?.price)}</Flash></td>
                 <td className={pctClass(q?.changePercent)}>
