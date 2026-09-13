@@ -10,16 +10,15 @@ const CHANNELS = [
     id: "cnbc",
     label: "CNBC",
     kind: "youtube",
-    channelId: "UCvJJ_dzjViJCoLf5uKUTwoA",
-    // Requested live source: https://www.youtube.com/watch?v=9NyxcX3rhQs
+    videoId: "9NyxcX3rhQs",
     url: "https://www.youtube.com/watch?v=9NyxcX3rhQs",
   },
   { id: "cheddar", label: "Cheddar Business", kind: "hls", url: "https://gpuserver3.tier1streams.com/CHEDDAR_BUSINESS/index.m3u8" },
   { id: "ndtv", label: "NDTV Profit", kind: "hls", url: "https://ndtvprofit.akamaized.net/hls/live/2107404/ndtvprofit/master_1.m3u8" },
 ] as const;
 
-const youtubeLiveEmbedUrl = (channelId: string) =>
-  `https://www.youtube-nocookie.com/embed/live_stream?channel=${encodeURIComponent(channelId)}&autoplay=1&mute=1&playsinline=1`;
+const youtubeEmbedUrl = (videoId: string) =>
+  `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&mute=1&playsinline=1`;
 
 export default function TvWidget() {
   const [channel, setChannel] = useState<(typeof CHANNELS)[number]>(CHANNELS[0]);
@@ -72,7 +71,7 @@ export default function TvWidget() {
         {channel.kind === "youtube" ? (
           <iframe
             key={channel.url}
-            src={youtubeLiveEmbedUrl(channel.channelId)}
+            src={youtubeEmbedUrl(channel.videoId)}
             title={`${channel.label} live stream`}
             className="w-full h-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture"
