@@ -10,6 +10,7 @@ const CHANNELS = [
     id: "cnbc",
     label: "CNBC",
     kind: "youtube",
+    // The channel-based live_stream embed fails with UE_ULI1obAacm3PA; keep the verified broadcast ID.
     videoId: "9NyxcX3rhQs",
     url: "https://www.youtube.com/watch?v=9NyxcX3rhQs",
   },
