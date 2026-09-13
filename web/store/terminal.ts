@@ -37,6 +37,7 @@ type TerminalState = {
   watchlist: string[];
   commandOpen: boolean;
   setActiveSymbol: (s: string) => void;
+  selectSymbol: (s: string) => void;
   setCommandOpen: (open: boolean) => void;
   addWidget: (type: WidgetType, symbol?: string) => void;
   removeWidget: (id: string) => void;
@@ -47,6 +48,15 @@ type TerminalState = {
   removeFromWatchlist: (s: string) => void;
   resetWorkspace: () => void;
 };
+
+const GLOBAL_SELECTION_WIDGETS = new Set<WidgetType>([
+  "boss-buy-zone",
+  "chart",
+  "news",
+  "insider",
+  "quote",
+  "options",
+]);
 
 const DEFAULT_WIDGETS: WidgetInstance[] = [
   { id: "w-boss-buy-zone", type: "boss-buy-zone", linked: true },
@@ -103,6 +113,18 @@ export const useTerminal = create<TerminalState>()(
       watchlist: BOSS_WATCHLIST,
       commandOpen: false,
       setActiveSymbol: (s) => set({ activeSymbol: s.toUpperCase() }),
+      // A selection made from the watchlist or command palette represents a
+      // workspace-wide navigation. Re-link the primary symbol views so a
+      // previously pinned widget cannot appear stale after that selection.
+      selectSymbol: (s) =>
+        set((st) => ({
+          activeSymbol: s.toUpperCase(),
+          widgets: st.widgets.map((widget) =>
+            GLOBAL_SELECTION_WIDGETS.has(widget.type)
+              ? { ...widget, linked: true }
+              : widget,
+          ),
+        })),
       setCommandOpen: (open) => set({ commandOpen: open }),
       addWidget: (type, symbol) =>
         set((st) => {
