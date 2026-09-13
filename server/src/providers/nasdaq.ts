@@ -37,20 +37,57 @@ const money = (s: unknown): number | null => {
   return isFinite(n) ? n : null;
 };
 
+// Assetclass guesses that turned out wrong get remembered here so a symbol
+// only pays the extra-retry cost once. Without this, an ETF outside the
+// seed list below would cost double the Nasdaq requests on every refresh —
+// QUOTE_TTL is 1s, so that adds up fast for anything on a default watchlist.
+const learnedAssetClass = new Map<string, "stocks" | "etf">();
+
 function assetClassOf(symbol: string): "stocks" | "etf" {
-  // Heuristic: most well-known ETF tickers used across the app; falls back to "stocks".
+  const learned = learnedAssetClass.get(symbol);
+  if (learned) return learned;
+  // Fast-path seed for the ETFs already known about; anything else starts as
+  // a guess of "stocks" and self-corrects via the retry in quote()/history()
+  // below — no need to keep growing this list by hand for every new ETF.
   const etfs = new Set(["SPY", "DIA", "QQQ", "GLD", "USO", "UUP", "IWM", "VTI", "TLT"]);
   return etfs.has(symbol) ? "etf" : "stocks";
 }
 
-export async function quote(symbol: string): Promise<Quote> {
-  const assetclass = assetClassOf(symbol);
+async function fetchQuoteRaw(symbol: string, assetclass: "stocks" | "etf") {
   const [info, summary] = await Promise.all([
     nfetch(`https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/info?assetclass=${assetclass}`),
     nfetch(`https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/summary?assetclass=${assetclass}`).catch(() => null),
   ]);
+  return { info, summary, price: money(info.primaryData?.lastSalePrice) };
+}
 
-  const price = money(info.primaryData?.lastSalePrice);
+export async function quote(symbol: string): Promise<Quote> {
+  const primary = assetClassOf(symbol);
+  let { info, summary, price } = await fetchQuoteRaw(symbol, primary);
+
+  if (price === null) {
+    // Nasdaq's own asset classes aren't self-describing in the response, so
+    // the only way to tell whether the guess above was wrong is to try the
+    // other one. A resolved-but-priceless response must not be treated as
+    // success here — getQuotes()'s Yahoo/Stooq fallback only ever runs when
+    // this throws, so silently accepting a null price would strand every
+    // symbol the seed list above doesn't know about on a blank quote.
+    const secondary = primary === "stocks" ? "etf" : "stocks";
+    try {
+      const retry = await fetchQuoteRaw(symbol, secondary);
+      if (retry.price !== null) {
+        ({ info, summary, price } = retry);
+        learnedAssetClass.set(symbol, secondary);
+      }
+    } catch {
+      // keep the original (price-less) response; the check below throws.
+    }
+  }
+
+  if (price === null) {
+    throw new Error(`nasdaq: no price for ${symbol} under stocks or etf`);
+  }
+
   const prevClose = money(info.primaryData?.previousClose) ?? money(summary?.summaryData?.PreviousClose?.value);
   const change = money(info.primaryData?.netChange);
   const pctChange = typeof info.primaryData?.percentageChange === "string"
@@ -102,11 +139,7 @@ const RANGE_DAYS: Record<string, number> = {
   "1D": 5, "5D": 10, "1M": 35, "6M": 190, YTD: 400, "1Y": 400, "5Y": 1900, MAX: 7300,
 };
 
-export async function history(symbol: string, rangeKey: string): Promise<Candle[]> {
-  const days = RANGE_DAYS[rangeKey] ?? 190;
-  const to = new Date();
-  const from = new Date(to.getTime() - days * 86_400_000);
-  const assetclass = assetClassOf(symbol);
+async function fetchHistoryRaw(symbol: string, assetclass: "stocks" | "etf", from: Date, to: Date): Promise<Candle[]> {
   const data = await nfetch(
     `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/chart?assetclass=${assetclass}&fromdate=${fmtDate(from)}&todate=${fmtDate(to)}`
   );
@@ -120,6 +153,36 @@ export async function history(symbol: string, rangeKey: string): Promise<Candle[
     const c = money(z.close);
     if (o === null || h === null || l === null || c === null) continue;
     candles.push({ time: Math.round(p.x / 1000), open: o, high: h, low: l, close: c, volume: money(z.volume) ?? 0 });
+  }
+  return candles;
+}
+
+export async function history(symbol: string, rangeKey: string): Promise<Candle[]> {
+  const days = RANGE_DAYS[rangeKey] ?? 190;
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 86_400_000);
+  const primary = assetClassOf(symbol);
+  let candles = await fetchHistoryRaw(symbol, primary, from, to);
+
+  if (candles.length === 0) {
+    // Same wrong-assetclass-guess problem as quote() above: an empty array
+    // is still a resolved promise, so withFallback() would treat this as a
+    // Nasdaq "success" and never try Yahoo/Stooq unless we throw instead.
+    const secondary = primary === "stocks" ? "etf" : "stocks";
+    try {
+      const retry = await fetchHistoryRaw(symbol, secondary, from, to);
+      if (retry.length > 0) {
+        candles = retry;
+        learnedAssetClass.set(symbol, secondary);
+      }
+    } catch {
+      // keep candles as []; the check below throws so the caller's
+      // fallback chain (Yahoo, then Stooq) actually gets a turn.
+    }
+  }
+
+  if (candles.length === 0) {
+    throw new Error(`nasdaq: no history for ${symbol} under stocks or etf`);
   }
   return candles;
 }
