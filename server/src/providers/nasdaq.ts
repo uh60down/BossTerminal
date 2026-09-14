@@ -63,9 +63,15 @@ async function fetchQuoteRaw(symbol: string, assetclass: "stocks" | "etf") {
 
 export async function quote(symbol: string): Promise<Quote> {
   const primary = assetClassOf(symbol);
-  let { info, summary, price } = await fetchQuoteRaw(symbol, primary);
+  let result: Awaited<ReturnType<typeof fetchQuoteRaw>> | null = null;
+  try {
+    result = await fetchQuoteRaw(symbol, primary);
+  } catch {
+    // A wrong asset class can return either an empty payload or no `data`
+    // envelope at all. Both cases must reach the alternate-class retry.
+  }
 
-  if (price === null) {
+  if (result?.price == null) {
     // Nasdaq's own asset classes aren't self-describing in the response, so
     // the only way to tell whether the guess above was wrong is to try the
     // other one. A resolved-but-priceless response must not be treated as
@@ -76,17 +82,18 @@ export async function quote(symbol: string): Promise<Quote> {
     try {
       const retry = await fetchQuoteRaw(symbol, secondary);
       if (retry.price !== null) {
-        ({ info, summary, price } = retry);
+        result = retry;
         learnedAssetClass.set(symbol, secondary);
       }
     } catch {
-      // keep the original (price-less) response; the check below throws.
+      // keep the original empty/failed result; the check below throws.
     }
   }
 
-  if (price === null) {
+  if (result?.price == null) {
     throw new Error(`nasdaq: no price for ${symbol} under stocks or etf`);
   }
+  const { info, summary, price } = result;
 
   const prevClose = money(info.primaryData?.previousClose) ?? money(summary?.summaryData?.PreviousClose?.value);
   const change = money(info.primaryData?.netChange);
@@ -162,7 +169,13 @@ export async function history(symbol: string, rangeKey: string): Promise<Candle[
   const to = new Date();
   const from = new Date(to.getTime() - days * 86_400_000);
   const primary = assetClassOf(symbol);
-  let candles = await fetchHistoryRaw(symbol, primary, from, to);
+  let candles: Candle[] = [];
+  try {
+    candles = await fetchHistoryRaw(symbol, primary, from, to);
+  } catch {
+    // A missing `data` envelope is also a wrong-class signal. Continue to
+    // the alternate class instead of abandoning Nasdaq immediately.
+  }
 
   if (candles.length === 0) {
     // Same wrong-assetclass-guess problem as quote() above: an empty array
@@ -273,5 +286,4 @@ export async function earningsSurprise(symbol: string): Promise<EarningsSurprise
     })
     .filter((r): r is EarningsSurpriseRow => r !== null);
 }
-
 
